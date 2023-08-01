@@ -15,5 +15,5 @@ __all__ = [
     ldap_get_values_lists, ldap_change_pwd, ldap_modify_user, ldap_modify_entry,
 ]
 
-__version__ = "0.1.2"
-__version_info__ = (0, 1, 2)
+__version__ = "0.1.3"
+__version_info__ = (0, 1, 3)

@@ -5,8 +5,7 @@ import tempfile
 from ldap import LDAPError, modlist
 from ldap.ldapobject import LDAPObject
 from typing import Final, TextIO
-from pypomes_core.env_pomes import APP_PREFIX, env_get_str, env_get_int
-from pypomes_core.exception_pomes import exc_format
+from pypomes_core import APP_PREFIX, env_get_str, env_get_int, exc_format
 
 _val: str = env_get_str(f"{APP_PREFIX}_LDAP_BASE_DN")
 LDAP_BASE_DN: Final[str] = None if _val is None else _val.replace(":", "=")
@@ -22,12 +21,20 @@ LDAP_TRACE_LEVEL:  Final[int] = env_get_int(f"{APP_PREFIX}_LDAP_TRACE_LEVEL", 0)
 
 def ldap_init(errors: list[str], server_uri: str = LDAP_SERVER_URI,
               trace_filepath: str = LDAP_TRACE_FILE, trace_level: int = LDAP_TRACE_LEVEL) -> LDAPObject:
-
-    # inicializa a variável de retorno
+    """
+    Initialize and return the LDAP client object.
+    
+    :param errors: incidental error messages
+    :param server_uri: URI to access the LDAP server
+    :param trace_filepath: path for the trace log file
+    :param trace_level: level for the trace log
+    :return: the LDAP client object
+    """
+    # initialize the return variable
     result: LDAPObject | None = None
 
     try:
-        # abre dispositivo de saída para trace
+        # retrieve/open the trace log  output device
         trace_out: TextIO
         match trace_filepath:
             case "sys.stdout" | None:
@@ -49,143 +56,179 @@ def ldap_init(errors: list[str], server_uri: str = LDAP_SERVER_URI,
         result.set_option(ldap.OPT_REFERRALS, 0)
         result.set_option(ldap.OPT_TIMEOUT, LDAP_TIMEOUT)
     except Exception as e:
-        errors.append(f"Erro na inicialização do cliente LDAP: {__ldap_except_msg(e)}")
+        errors.append(f"Error initializing the LDAP client: {__ldap_except_msg(e)}")
 
     return result
 
 
-def ldap_bind(errors: list[str], conn: LDAPObject,
+def ldap_bind(errors: list[str], ldap_client: LDAPObject,
               bind_dn: str = LDAP_BIND_DN, bind_pwd: str = LDAP_BIND_PWD) -> bool:
-
-    # inicializa a variável de retorno
+    """
+    Bind the given LDAP client object *conn* with the LDAP server, using the *DN* credentials *bind_dn*.
+    
+    :param errors: incidental error messages
+    :param ldap_client: the LDAP client object
+    :param bind_dn: DN credentials for the bind operation
+    :param bind_pwd: password for the bind operation
+    :return: True if the bind operation ewas successful, False otherwise
+    """
+    # initialize the return variable
     result: bool = False
 
-    # faz o enlace
+    # perform the bind
     try:
-        conn.simple_bind_s(who=bind_dn,
-                           cred=bind_pwd)
+        ldap_client.simple_bind_s(who=bind_dn,
+                                  cred=bind_pwd)
         result = True
     except Exception as e:
-        errors.append(f"Erro no enlace com o servidor LDAP: {__ldap_except_msg(e)}")
+        errors.append(f"Error binding with the LDAP server: {__ldap_except_msg(e)}")
 
     return result
 
 
-def ldap_unbind(errors: list[str], conn: LDAPObject):
-
+def ldap_unbind(errors: list[str], ldap_client: LDAPObject):
+    """
+    Unbind the given LDAP client object *conn* with the LDAP server.
+    
+    :param errors: incidental error messages
+    :param ldap_client: the LDAP client object
+    """
     try:
-        conn.unbind_s()
-        # o dispositivo de saída do trace é stdout ou stderr ?
+        ldap_client.unbind_s()
+        # is the log device 'stdout' ou 'stderr' ?
         # noinspection PyProtectedMember
-        if conn._trace_file.name not in ["<stdout>", "<stderr>"]:
-            # não, feche o dispositivo
+        if ldap_client._trace_file.name not in ["<stdout>", "<stderr>"]:
+            # no, close the log device
             # noinspection PyProtectedMember
-            conn._trace_file.close()
+            ldap_client._trace_file.close()
     except Exception as e:
-        errors.append(f"Erro ao desfazer o enlace com o servidor LDAP: {__ldap_except_msg(e)}")
+        errors.append(f"Error unbinding with the LDAP server: {__ldap_except_msg(e)}")
 
 
 def ldap_add_entry(errors: list[str], entry_dn: str, attrs: dict):
-
-    # inicializa o serviço LDAP
-    conn: LDAPObject = ldap_init(errors)
+    """
+    Add an entry to the LDAP store.
+    
+    :param errors: incidental error messages
+    :param entry_dn: the entry DN
+    :param attrs: the entry attributes
+    """
+    # obtain the LDAP client object
+    ldap_client: LDAPObject = ldap_init(errors)
 
     bound: bool = False
-    # a conexão foi inicializada ?
-    if conn is not None:
-        # sim, faça o enlace com o servidor LDAP
-        bound = ldap_bind(errors, conn)
+    # was the LDAP client object obtained ?
+    if ldap_client is not None:
+        # yes, bind it with the LDAP server
+        bound = ldap_bind(errors, ldap_client)
 
-    # houve erros ?
+    # were there errors ?
     if len(errors) == 0:
-        # não, prossiga
+        # no, proceed
         ldiff: list[tuple[any, any]] = modlist.addModlist(attrs)
         try:
-            conn.add_s(dn=entry_dn,
-                       modlist=ldiff)
+            ldap_client.add_s(dn=entry_dn,
+                              modlist=ldiff)
         except Exception as e:
-            errors.append(f"Erro na operação ldap_add_entry: {__ldap_except_msg(e)}")
+            errors.append(f"Error on the LDAP add entry operation: {__ldap_except_msg(e)}")
 
-    # desfaz o enlace com o servidor LDAP, se necessário
+    # unbind the LDAP client, if applicable
     if bound:
-        ldap_unbind(errors, conn)
+        ldap_unbind(errors, ldap_client)
 
 
 def ldap_modify_entry(errors: list[str], entry_dn: str, mod_entry: list[tuple[int, str, any]]):
-
-    # inicializa o serviço LDAP
+    """
+    Add an entry to the LDAP store.
+    
+    :param errors: incidental error messages
+    :param entry_dn: the entry DN
+    :param mod_entry: the list of modified entry attributes
+    """
+    # obtain the LDAP client object
     conn: LDAPObject = ldap_init(errors)
 
     bound: bool = False
-    # a conexão foi inicializada ?
+    # was the LDAP client object obtained ?
     if conn is not None:
-        # sim, faça o enlace com o servidor LDAP
+        # yes, bind it with the LDAP server
         bound = ldap_bind(errors, conn)
 
-    # houve erros ?
+    # were there errors ?
     if len(errors) == 0:
-        # não, prossiga
+        # no, proceed
         try:
             conn.modify_s(dn=entry_dn,
                           modlist=mod_entry)
         except Exception as e:
-            errors.append(f"Erro na operação ldap_modify_entry: {__ldap_except_msg(e)}")
+            errors.append(f"Error on the LDAP modify entry operation: {__ldap_except_msg(e)}")
 
-    # desfaz o enlace com o servidor LDAP, se necessário
+    # unbind the LDAP client, if applicable
     if bound:
         ldap_unbind(errors, conn)
 
 
 def ldap_delete_entry(errors: list[str], entry_dn: str):
-
-    # inicializa o serviço LDAP
+    """
+    Remove an entry to the LDAP store.
+    
+    :param errors: incidental error messages
+    :param entry_dn: the entry DN
+    """
+    # obtain the LDAP client object
     conn: LDAPObject = ldap_init(errors)
 
     bound: bool = False
-    # a conexão foi inicializada ?
+    # was the LDAP client object obtained ?
     if conn is not None:
-        # sim, faça o enlace com o servidor LDAP
+        # yes, bind it with the LDAP server
         bound = ldap_bind(errors, conn)
 
-    # houve erros ?
+    # were there errors ?
     if len(errors) == 0:
-        # não, prossiga
+        # no, proceed
         try:
             conn.delete_s(dn=entry_dn)
         except Exception as e:
-            errors.append(f"Erro na operação ldap_delete_entry: {__ldap_except_msg(e)}")
+            errors.append(f"Error on the LDAP delete entry operation: {__ldap_except_msg(e)}")
 
-    # desfaz o enlace com o servidor LDAP, se necessário
+    # unbind the LDAP client, if applicable
     if bound:
         ldap_unbind(errors, conn)
 
 
 def ldap_modify_user(errors: list[str], user_id: str, attrs: list[tuple[str, bytes | None]]):
-
-    # invoque a operação de consulta
+    """
+    Modify a user entry at the LDAP store.
+    
+    :param errors: incidental error messages
+    :param user_id: id of the user
+    :param attrs: the list of modified attributes
+    """
+    # invoke the search operation
     search_data: list[tuple[str, dict]] = ldap_search(errors, f"cn=users,{LDAP_BASE_DN}",
                                                       [attr[0] for attr in attrs],
                                                       ldap.SCOPE_ONELEVEL, f"cn={user_id}")
 
-    # a consulta retornou dados ?
+    # did the search operation returned data ?
     if search_data is None or len(search_data) == 0:
-        # não, reporte o erro
-        errors.append(f"Erro na operação ldap_modify_user: Usuário '{user_id}' não encontrado")
+        # no, report the error
+        errors.append(f"Error on the LDAP modify user operation: User '{user_id}' not found")
 
-    # houve erros ?
+    # were there errors ?
     if len(errors) == 0:
-        # não, prossiga
+        # no, proceed
         entry_dn: str = search_data[0][0]
 
-        # constrói a lista de modificações
+        # build the modification list
         mod_entries: list[tuple[int, str, bytes | None]] = []
         for attr_name, new_value in attrs:
             entry_list: list[bytes] = search_data[0][1].get(attr_name)
             if new_value is not None:
                 curr_value: bytes = None if entry_list is None else entry_list[0]
-                # avalia se os valores atual e novo são distintos
+                # assert whether the old and new values are equal
                 if new_value != curr_value:
-                    # define o modo de atualização
+                    # define the modification mode
                     if curr_value is None:
                         mode: int = ldap.MOD_ADD
                     else:
@@ -194,86 +237,104 @@ def ldap_modify_user(errors: list[str], user_id: str, attrs: list[tuple[str, byt
             elif entry_list is not None:
                 mod_entries.append((ldap.MOD_DELETE, attr_name, None))
 
-        # há atributos a serem modificados ?
+        # are there attributes to be modified ?
         if len(mod_entries) > 0:
-            # sim, modifique-os
+            # yes, modify them
             ldap_modify_entry(errors, entry_dn, mod_entries)
 
 
 def ldap_change_pwd(errors: list[str], user_dn: str, new_pwd: str, curr_pwd: str | None = None) -> str:
-
-    # inicializa a variável de retorno
+    """
+    Modify a user password at the LDAP store.
+    
+    :param errors: incidental error messages
+    :param user_dn: the user's DN credentials
+    :param new_pwd: the new password
+    :param curr_pwd: optional current password
+    """
+    # initialize the return variable
     result: str | None = None
 
-    # inicializa o serviço LDAP
-    conn: LDAPObject = ldap_init(errors)
+    # obtain the LDAP client object
+    ldap_client: LDAPObject = ldap_init(errors)
 
     bound: bool = False
-    # faça o enlace com o servidor LDAP, se a conexão foi inicializada
-    if conn is not None:
-        # a senha associada ao DN foi especificada ?
+    # bind the LDAP client with the LDAP server, if obtained
+    if ldap_client is not None:
+        # was the password provided ?
         if curr_pwd is None:
-            # não, faça o enlace padrão
-            bound = ldap_bind(errors, conn)
+            # no, perform the standard bind
+            bound = ldap_bind(errors, ldap_client)
         else:
-            # sim, faça o enlace com o DN fornecido
-            bound = ldap_bind(errors, conn, user_dn, curr_pwd)
+            # yes, perform the bind with the DN provided
+            bound = ldap_bind(errors, ldap_client, user_dn, curr_pwd)
 
-    # houve erros ?
+    # were there errors ?
     if len(errors) == 0:
         try:
-            # a conexão é segura ?
-            if __is_secure(conn):
-                # sim, use a diretiva 'passwd_s'
-                resp: tuple[None, bytes] = conn.passwd_s(user=user_dn,
-                                                         oldpw=curr_pwd,
-                                                         newpw=new_pwd,
-                                                         extract_newpw=True)
+            # is the connection safe ?
+            if __is_secure(ldap_client):
+                # yes, use the directive 'passwd_s'
+                resp: tuple[None, bytes] = ldap_client.passwd_s(user=user_dn,
+                                                                oldpw=curr_pwd,
+                                                                newpw=new_pwd,
+                                                                extract_newpw=True)
                 result = resp[1].decode()
             else:
-                # não, use a diretiva 'modify_s'
-                conn.modify_s(dn=user_dn,
-                              modlist=[(ldap.MOD_REPLACE, "userpassword", new_pwd.encode())])
+                # no, use the directive 'modify_s'
+                ldap_client.modify_s(dn=user_dn,
+                                     modlist=[(ldap.MOD_REPLACE, "userpassword", new_pwd.encode())])
                 result = new_pwd
         except Exception as e:
-            errors.append(f"Erro na operação ldap_change_pwd: {__ldap_except_msg(e)}")
+            errors.append(f"Error on the LDAP password change operation: {__ldap_except_msg(e)}")
 
-    # desfaz o enlace com o servidor LDAP, se necessário
+    # unbind the LDAP client, if applicable
     if bound:
-        ldap_unbind(errors, conn)
+        ldap_unbind(errors, ldap_client)
 
     return result
 
 
 def ldap_search(errors: list[str], base_dn: str,  attrs: list[str],
                 scope: str = None, filter_str: str = None, attrs_only: bool = False) -> list[tuple[str, dict]]:
+    """
+    Perform a search operation on the LDAP store, and return its results.
 
-    # inicializa a variável de retorno
+    :param errors: incidental error messages
+    :param base_dn: the base DN
+    :param attrs: attributes to search for
+    :param scope: optional scope for the search operation
+    :param filter_str: optional filter for the search operation
+    :param attrs_only: whether to return the values of the attributes searched
+    :return:
+    """
+    # initialize the return variable
     result:  list[tuple[str, dict]] | None = None
 
-    # inicializa o serviço LDAP
+    # obtain the LDAP client object
     conn: LDAPObject = ldap_init(errors)
 
     bound: bool = False
-    # a conexão foi inicializada ?
+    # was the LDAP client object obtained ?
     if conn is not None:
-        # sim, faça o enlace com o servidor LDAP
+        # yes, bind it with the LDAP server
         bound = ldap_bind(errors, conn)
 
-    # houve erros ?
+    # were there errors ?
     if len(errors) == 0:
-        # não, prossiga (se attrs_only for especificado, os valores dos atributos não são retornados)
+        # no, proceed (if 'attrs_only' is specified, the values for the attributes are not returned)
         attr_vals: int = 1 if attrs_only else 0
         try:
+            # perform the search operation
             result = conn.search_s(base=base_dn,
                                    scope=scope or ldap.SCOPE_BASE,
                                    filterstr=filter_str or "(objectClass=*)",
                                    attrlist=attrs,
                                    attrsonly=attr_vals)
         except Exception as e:
-            errors.append(f"Erro na operação ldap_search: {__ldap_except_msg(e)}")
+            errors.append(f"Error on the LDAP search operation: {__ldap_except_msg(e)}")
 
-    # desfaz o enlace com o servidor LDAP, se necessário
+    # unbind the LDAP client, if applicable
     if bound:
         ldap_unbind(errors, conn)
 
@@ -281,7 +342,14 @@ def ldap_search(errors: list[str], base_dn: str,  attrs: list[str],
 
 
 def ldap_get_value(errors: list[str], entry_dn: str, attr: str) -> bytes:
+    """
+    Retrieve and return the value of an attribute at the LDAP store.
 
+    :param errors: incidental error messages
+    :param entry_dn: the DN entry
+    :param attr: target attribute
+    :return: the target attribute's value
+    """
     data: list[bytes] = ldap_get_value_list(errors, entry_dn, attr)
     result: bytes = data[0] if isinstance(data, list) and len(data) > 0 else None
 
@@ -289,19 +357,35 @@ def ldap_get_value(errors: list[str], entry_dn: str, attr: str) -> bytes:
 
 
 def ldap_add_value(errors: list[str], entry_dn: str, attr: str, value: bytes):
+    """
+    Add a value to an attribute at the LDAP store.
 
+    :param errors: incidental error messages
+    :param entry_dn: the DN entry
+    :param attr: target attribute
+    :param value: value to add to the target attribute
+    :return: the target attribute's value
+    """
     mod_entries: list[tuple[int, str, bytes]] = [(ldap.MOD_ADD, attr, value)]
     ldap_modify_entry(errors, entry_dn, mod_entries)
 
 
 def ldap_set_value(errors: list[str], entry_dn: str, attr: str, value: bytes | None):
+    """
+    Add a value to an attribute at the LDAP store.
 
-    # obtem o valor atual
+    :param errors: incidental error messages
+    :param entry_dn: the DN entry
+    :param attr: target attribute
+    :param value: value to add to the target attribute
+    :return: the target attribute's value
+    """
+    # obtain the target attribute's current value
     curr_value: bytes = ldap_get_value(errors, entry_dn, attr)
 
-    # houve erros ?
+    # were there errors ?
     if len(errors) == 0:
-        # não, defina o modo de atualização da estrutura LDAP
+        # no, determine the modification mode
         mode: int | None = None
         if curr_value is None:
             if value is not None:
@@ -311,24 +395,31 @@ def ldap_set_value(errors: list[str], entry_dn: str, attr: str, value: bytes | N
         elif curr_value != value:
             mode = ldap.MOD_REPLACE
 
-        # o modo de atualização da estrutura LDAP foi definido ?
+        # was the modification mode determined ?
         if mode is not None:
-            # sim, atualize-a
+            # yes, update the LDAP store
             mod_entries: list[tuple[int, str, bytes]] = [(mode, attr, value)]
             ldap_modify_entry(errors, entry_dn, mod_entries)
 
 
 def ldap_get_value_list(errors: list[str], entry_dn: str, attr: str) -> list[bytes]:
+    """
+    Retrieve and return the list of values of attribute *attr* in the LDAP store.
 
-    # inicializa variável de retorno
+    :param errors: incidental error messages
+    :param entry_dn: the DN of the target entry
+    :param attr: the target attribute
+    :return: the target attribute's list of values
+    """
+    # initialize the return variable
     result: list[bytes] | None = None
 
-    # executa a consulta
+    # perform the search operation
     search_data: list[tuple[str, dict]] = ldap_search(errors, entry_dn, [attr])
 
-    # a consulta retornou dados ?
+    # did the search operation return data ?
     if isinstance(search_data, list) and len(search_data) > 0:
-        # sim, prossiga
+        # yes, proceed
         user_data: dict = search_data[0][1]
         result = user_data.get(attr)
 
@@ -336,16 +427,23 @@ def ldap_get_value_list(errors: list[str], entry_dn: str, attr: str) -> list[byt
 
 
 def ldap_get_values(errors: list[str], entry_dn: str, attrs: list[str]) -> tuple[bytes]:
+    """
+    Retrieve and return the values of attributes *attrs* in the LDAP store.
 
-    # inicializa variável de retorno
+    :param errors: incidental error messages
+    :param entry_dn: the DN of the target entry
+    :param attrs: the list of target attributes
+    :return: the values for the target attributes
+    """
+    # initialize the return variable
     result: tuple[bytes] | None = None
 
-    # executa a consulta
+    # perform the search operation
     search_data: tuple[list[bytes | None] | None] = ldap_get_values_lists(errors, entry_dn, attrs)
 
-    # a consulta retornou dados ?
+    # did the search operation return data ?
     if isinstance(search_data, tuple):
-        # sim, prossiga
+        # yes, proceed
         search_items: list[bytes] = [item if item is None else item[0] for item in search_data]
         result = tuple(search_items)
 
@@ -353,16 +451,23 @@ def ldap_get_values(errors: list[str], entry_dn: str, attrs: list[str]) -> tuple
 
 
 def ldap_get_values_lists(errors: list[str], entry_dn: str, attrs: list[str]) -> tuple[list[bytes]]:
+    """
+    Retrieve and return the lists of values of attributes *attrs* in the LDAP store.
 
-    # inicializa variável de retorno
+    :param errors: incidental error messages
+    :param entry_dn: the DN of the target entry
+    :param attrs: the list of target attributes
+    :return: the target attributes' lists of values
+    """
+    # initialize the return variable
     result: tuple[list[bytes]] | None = None
 
-    # executa a consulta
+    # perform the search operation
     search_data: list[tuple[str, dict]] = ldap_search(errors, entry_dn, attrs)
 
-    # a consulta retornou dados ?
+    # did the search operation return data ?
     if isinstance(search_data, list) and len(search_data) > 0:
-        # sim, prossiga
+        # yes, proceed
         user_data: dict = search_data[0][1]
         items: list[list[bytes]] = []
         for attr in attrs:
