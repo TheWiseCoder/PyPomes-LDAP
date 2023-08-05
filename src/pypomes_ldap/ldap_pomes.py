@@ -1,11 +1,11 @@
 import ldap
-import os
 import sys
 import tempfile
 from ldap import LDAPError, modlist
 from ldap.ldapobject import LDAPObject
+from pathlib import Path
 from typing import Final, TextIO
-from pypomes_core import APP_PREFIX, env_get_str, env_get_int, exc_format
+from pypomes_core import APP_PREFIX, env_get_str, env_get_int, env_get_path, exc_format
 
 _val: str = env_get_str(f"{APP_PREFIX}_LDAP_BASE_DN")
 LDAP_BASE_DN: Final[str] = None if _val is None else _val.replace(":", "=")
@@ -14,13 +14,13 @@ LDAP_BIND_DN:  Final[str] = None if _val is None else _val.replace(":", "=")
 LDAP_BIND_PWD:  Final[str] = env_get_str(f"{APP_PREFIX}_LDAP_BIND_PWD")
 LDAP_SERVER_URI:  Final[str] = env_get_str(f"{APP_PREFIX}_LDAP_SERVER_URI")
 LDAP_TIMEOUT:  Final[int] = env_get_int(f"{APP_PREFIX}_LDAP_TIMEOUT", 30)
-LDAP_TRACE_FILE:  Final[str] = env_get_str(f"{APP_PREFIX}_LDAP_TRACE_FILEPATH",
-                                           os.path.join(tempfile.gettempdir(), f"{APP_PREFIX}_ldap.log"))
+LDAP_TRACE_FILEPATH:  Final[Path] = env_get_path(f"{APP_PREFIX}_LDAP_TRACE_FILEPATH",
+                                                 Path(tempfile.gettempdir()) / f"{APP_PREFIX}_ldap.log")
 LDAP_TRACE_LEVEL:  Final[int] = env_get_int(f"{APP_PREFIX}_LDAP_TRACE_LEVEL", 0)
 
 
 def ldap_init(errors: list[str], server_uri: str = LDAP_SERVER_URI,
-              trace_filepath: str = LDAP_TRACE_FILE, trace_level: int = LDAP_TRACE_LEVEL) -> LDAPObject:
+              trace_filepath: Path = LDAP_TRACE_FILEPATH, trace_level: int = LDAP_TRACE_LEVEL) -> LDAPObject:
     """
     Initialize and return the LDAP client object.
     
@@ -42,7 +42,7 @@ def ldap_init(errors: list[str], server_uri: str = LDAP_SERVER_URI,
             case "sys.stderr":
                 trace_out = sys.stderr
             case _:
-                trace_out = open(trace_filepath, "a")
+                trace_out = Path.open(trace_filepath, "a")
 
         if not isinstance(trace_level, int):
             trace_level = 0
@@ -86,7 +86,7 @@ def ldap_bind(errors: list[str], ldap_client: LDAPObject,
     return result
 
 
-def ldap_unbind(errors: list[str], ldap_client: LDAPObject):
+def ldap_unbind(errors: list[str], ldap_client: LDAPObject) -> None:
     """
     Unbind the given LDAP client object *conn* with the LDAP server.
     
@@ -97,15 +97,15 @@ def ldap_unbind(errors: list[str], ldap_client: LDAPObject):
         ldap_client.unbind_s()
         # is the log device 'stdout' ou 'stderr' ?
         # noinspection PyProtectedMember
-        if ldap_client._trace_file.name not in ["<stdout>", "<stderr>"]:
+        if ldap_client._trace_file.name not in ["<stdout>", "<stderr>"]: # noqa SLF001
             # no, close the log device
             # noinspection PyProtectedMember
-            ldap_client._trace_file.close()
+            ldap_client._trace_file.close() # noqa SLF001
     except Exception as e:
         errors.append(f"Error unbinding with the LDAP server: {__ldap_except_msg(e)}")
 
 
-def ldap_add_entry(errors: list[str], entry_dn: str, attrs: dict):
+def ldap_add_entry(errors: list[str], entry_dn: str, attrs: dict) -> None:
     """
     Add an entry to the LDAP store.
     
@@ -137,7 +137,7 @@ def ldap_add_entry(errors: list[str], entry_dn: str, attrs: dict):
         ldap_unbind(errors, ldap_client)
 
 
-def ldap_modify_entry(errors: list[str], entry_dn: str, mod_entry: list[tuple[int, str, any]]):
+def ldap_modify_entry(errors: list[str], entry_dn: str, mod_entry: list[tuple[int, str, any]]) -> None:
     """
     Add an entry to the LDAP store.
     
@@ -168,7 +168,7 @@ def ldap_modify_entry(errors: list[str], entry_dn: str, mod_entry: list[tuple[in
         ldap_unbind(errors, conn)
 
 
-def ldap_delete_entry(errors: list[str], entry_dn: str):
+def ldap_delete_entry(errors: list[str], entry_dn: str) -> None:
     """
     Remove an entry to the LDAP store.
     
@@ -197,7 +197,7 @@ def ldap_delete_entry(errors: list[str], entry_dn: str):
         ldap_unbind(errors, conn)
 
 
-def ldap_modify_user(errors: list[str], user_id: str, attrs: list[tuple[str, bytes | None]]):
+def ldap_modify_user(errors: list[str], user_id: str, attrs: list[tuple[str, bytes | None]]) -> None:
     """
     Modify a user entry at the LDAP store.
     
@@ -356,7 +356,7 @@ def ldap_get_value(errors: list[str], entry_dn: str, attr: str) -> bytes:
     return result
 
 
-def ldap_add_value(errors: list[str], entry_dn: str, attr: str, value: bytes):
+def ldap_add_value(errors: list[str], entry_dn: str, attr: str, value: bytes) -> None:
     """
     Add a value to an attribute at the LDAP store.
 
@@ -370,7 +370,7 @@ def ldap_add_value(errors: list[str], entry_dn: str, attr: str, value: bytes):
     ldap_modify_entry(errors, entry_dn, mod_entries)
 
 
-def ldap_set_value(errors: list[str], entry_dn: str, attr: str, value: bytes | None):
+def ldap_set_value(errors: list[str], entry_dn: str, attr: str, value: bytes | None) -> None:
     """
     Add a value to an attribute at the LDAP store.
 
@@ -469,9 +469,7 @@ def ldap_get_values_lists(errors: list[str], entry_dn: str, attrs: list[str]) ->
     if isinstance(search_data, list) and len(search_data) > 0:
         # yes, proceed
         user_data: dict = search_data[0][1]
-        items: list[list[bytes]] = []
-        for attr in attrs:
-            items.append(user_data.get(attr))
+        items: list[list[bytes]] = [user_data.get(attr) for attr in attrs]
         result = tuple(items)
 
     return result
@@ -480,7 +478,7 @@ def ldap_get_values_lists(errors: list[str], entry_dn: str, attrs: list[str]) ->
 def __is_secure(conn: LDAPObject) -> bool:
 
     # noinspection PyProtectedMember
-    return conn._uri.startswith("ldaps:")
+    return conn._uri.startswith("ldaps:") # noqa SLF001
 
 
 # constrói a mensagem de erro a partir da exceção produzida
