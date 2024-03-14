@@ -1,11 +1,10 @@
 import ldap
 import sys
-import tempfile
 from ldap import LDAPError, modlist
 from ldap.ldapobject import LDAPObject
 from pathlib import Path
 from typing import Final, TextIO
-from pypomes_core import APP_PREFIX, env_get_str, env_get_int, env_get_path, exc_format
+from pypomes_core import APP_PREFIX, TEMP_DIR, env_get_str, env_get_int, env_get_path, exc_format
 
 _val: str = env_get_str(f"{APP_PREFIX}_LDAP_BASE_DN")
 LDAP_BASE_DN: Final[str] = None if _val is None else _val.replace(":", "=")
@@ -15,7 +14,7 @@ LDAP_BIND_PWD:  Final[str] = env_get_str(f"{APP_PREFIX}_LDAP_BIND_PWD")
 LDAP_SERVER_URI:  Final[str] = env_get_str(f"{APP_PREFIX}_LDAP_SERVER_URI")
 LDAP_TIMEOUT:  Final[int] = env_get_int(f"{APP_PREFIX}_LDAP_TIMEOUT", 30)
 LDAP_TRACE_FILEPATH:  Final[Path] = env_get_path(f"{APP_PREFIX}_LDAP_TRACE_FILEPATH",
-                                                 Path(tempfile.gettempdir()) / f"{APP_PREFIX}_ldap.log")
+                                                 TEMP_DIR / f"{APP_PREFIX}_ldap.log")
 LDAP_TRACE_LEVEL:  Final[int] = env_get_int(f"{APP_PREFIX}_LDAP_TRACE_LEVEL", 0)
 
 
@@ -118,7 +117,7 @@ def ldap_add_entry(errors: list[str], entry_dn: str, attrs: dict) -> None:
 
     bound: bool = False
     # was the LDAP client object obtained ?
-    if ldap_client is not None:
+    if ldap_client:
         # yes, bind it with the LDAP server
         bound = ldap_bind(errors, ldap_client)
 
@@ -150,7 +149,7 @@ def ldap_modify_entry(errors: list[str], entry_dn: str, mod_entry: list[tuple[in
 
     bound: bool = False
     # was the LDAP client object obtained ?
-    if conn is not None:
+    if conn:
         # yes, bind it with the LDAP server
         bound = ldap_bind(errors, conn)
 
@@ -180,7 +179,7 @@ def ldap_delete_entry(errors: list[str], entry_dn: str) -> None:
 
     bound: bool = False
     # was the LDAP client object obtained ?
-    if conn is not None:
+    if conn:
         # yes, bind it with the LDAP server
         bound = ldap_bind(errors, conn)
 
@@ -211,7 +210,7 @@ def ldap_modify_user(errors: list[str], user_id: str, attrs: list[tuple[str, byt
                                                       ldap.SCOPE_ONELEVEL, f"cn={user_id}")
 
     # did the search operation returned data ?
-    if search_data is None or len(search_data) == 0:
+    if not search_data:  # search_data is None or len(search_data) == 0
         # no, report the error
         errors.append(f"Error on the LDAP modify user operation: User '{user_id}' not found")
 
@@ -224,7 +223,7 @@ def ldap_modify_user(errors: list[str], user_id: str, attrs: list[tuple[str, byt
         mod_entries: list[tuple[int, str, bytes | None]] = []
         for attr_name, new_value in attrs:
             entry_list: list[bytes] = search_data[0][1].get(attr_name)
-            if new_value is not None:
+            if new_value:
                 curr_value: bytes = None if entry_list is None else entry_list[0]
                 # assert whether the old and new values are equal
                 if new_value != curr_value:
@@ -234,7 +233,7 @@ def ldap_modify_user(errors: list[str], user_id: str, attrs: list[tuple[str, byt
                     else:
                         mode: int = ldap.MOD_REPLACE
                     mod_entries.append((mode, attr_name, new_value))
-            elif entry_list is not None:
+            elif entry_list:
                 mod_entries.append((ldap.MOD_DELETE, attr_name, None))
 
         # are there attributes to be modified ?
@@ -260,14 +259,14 @@ def ldap_change_pwd(errors: list[str], user_dn: str, new_pwd: str, curr_pwd: str
 
     bound: bool = False
     # bind the LDAP client with the LDAP server, if obtained
-    if ldap_client is not None:
+    if ldap_client:
         # was the password provided ?
-        if curr_pwd is None:
-            # no, perform the standard bind
-            bound = ldap_bind(errors, ldap_client)
-        else:
+        if curr_pwd:
             # yes, perform the bind with the DN provided
             bound = ldap_bind(errors, ldap_client, user_dn, curr_pwd)
+        else:
+            # no, perform the standard bind
+            bound = ldap_bind(errors, ldap_client)
 
     # were there errors ?
     if len(errors) == 0:
@@ -316,7 +315,7 @@ def ldap_search(errors: list[str], base_dn: str,  attrs: list[str],
 
     bound: bool = False
     # was the LDAP client object obtained ?
-    if conn is not None:
+    if conn:
         # yes, bind it with the LDAP server
         bound = ldap_bind(errors, conn)
 
@@ -490,7 +489,7 @@ def __ldap_except_msg(exc: Exception) -> str:
         cls: str = f"{type(exc)}"[8:-2]
         result: str = f"'Type: {cls}; Code: {err_data.get('result')}; Msg: {err_data.get('desc')}'"
         info: str = err_data.get("info")
-        if info is not None:
+        if info:
             result = f"{result[:-1]}; Info: {info}'"
     else:
         result: str = exc_format(exc, sys.exc_info())

@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "pip>=23.1.2",
-    "pypomes_core>=0.2.3",
+    "pypomes_core>=0.3.3",
     "python-ldap>=3.4.0",
     "setuptools>=68.0.0",
     "wheel>=0.41.0"
