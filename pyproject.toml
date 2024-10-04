@@ -6,11 +6,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pypomes_ldap"
-version = "0.1.5"
+version = "0.1.6"
 authors = [
   { name="GT Nunes", email="wisecoder01@gmail.com" }
 ]
-description = "A collection of Python pomes, pennyeach (LDAP module)"
+description = "A collection of Python pomes, penyeach (LDAP module)"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -19,11 +19,11 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
-    "pip>=23.1.2",
-    "pypomes_core>=1.0.7",
+    "pip>=24.2",
+    "pypomes_core>=1.5.4",
     "python-ldap>=3.4.0",
-    "setuptools>=68.0.0",
-    "wheel>=0.41.0"
+    "setuptools>=75.1.0",
+    "wheel>=0.44.0"
 ]
 
 [project.urls]

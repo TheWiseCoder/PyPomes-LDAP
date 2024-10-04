@@ -21,8 +21,10 @@ LDAP_TRACE_FILEPATH:  Final[Path] = env_get_path(f"{APP_PREFIX}_LDAP_TRACE_FILEP
 LDAP_TRACE_LEVEL:  Final[int] = env_get_int(f"{APP_PREFIX}_LDAP_TRACE_LEVEL", 0)
 
 
-def ldap_init(errors: list[str], server_uri: str = LDAP_SERVER_URI,
-              trace_filepath: Path = LDAP_TRACE_FILEPATH, trace_level: int = LDAP_TRACE_LEVEL) -> LDAPObject:
+def ldap_init(errors: list[str],
+              server_uri: str = LDAP_SERVER_URI,
+              trace_filepath: Path = LDAP_TRACE_FILEPATH,
+              trace_level: int = LDAP_TRACE_LEVEL) -> LDAPObject:
     """
     Initialize and return the LDAP client object.
 
@@ -49,22 +51,27 @@ def ldap_init(errors: list[str], server_uri: str = LDAP_SERVER_URI,
         if not isinstance(trace_level, int):
             trace_level = 0
 
-        # obtem a conexão
+        # obtain the connection
         result = ldap.initialize(uri=server_uri,
                                  trace_level=trace_level,
                                  trace_file=trace_out)
-        # configura a conexão
-        result.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
-        result.set_option(ldap.OPT_REFERRALS, 0)
-        result.set_option(ldap.OPT_TIMEOUT, LDAP_TIMEOUT)
+        # configure the connection
+        result.set_option(option=ldap.OPT_PROTOCOL_VERSION,
+                          invalue=3)
+        result.set_option(option=ldap.OPT_REFERRALS,
+                          invalue=0)
+        result.set_option(option=ldap.OPT_TIMEOUT,
+                          invalue=LDAP_TIMEOUT)
     except Exception as e:
         errors.append(f"Error initializing the LDAP client: {__ldap_except_msg(e)}")
 
     return result
 
 
-def ldap_bind(errors: list[str], ldap_client: LDAPObject,
-              bind_dn: str = LDAP_BIND_DN, bind_pwd: str = LDAP_BIND_PWD) -> bool:
+def ldap_bind(errors: list[str],
+              ldap_client: LDAPObject,
+              bind_dn: str = LDAP_BIND_DN,
+              bind_pwd: str = LDAP_BIND_PWD) -> bool:
     """
     Bind the given LDAP client object *conn* with the LDAP server, using the *DN* credentials *bind_dn*.
 
@@ -88,7 +95,8 @@ def ldap_bind(errors: list[str], ldap_client: LDAPObject,
     return result
 
 
-def ldap_unbind(errors: list[str], ldap_client: LDAPObject) -> None:
+def ldap_unbind(errors: list[str],
+                ldap_client: LDAPObject) -> None:
     """
     Unbind the given LDAP client object *conn* with the LDAP server.
 
@@ -107,7 +115,9 @@ def ldap_unbind(errors: list[str], ldap_client: LDAPObject) -> None:
         errors.append(f"Error unbinding with the LDAP server: {__ldap_except_msg(e)}")
 
 
-def ldap_add_entry(errors: list[str], entry_dn: str, attrs: dict) -> None:
+def ldap_add_entry(errors: list[str],
+                   entry_dn: str,
+                   attrs: dict) -> None:
     """
     Add an entry to the LDAP store.
 
@@ -116,15 +126,15 @@ def ldap_add_entry(errors: list[str], entry_dn: str, attrs: dict) -> None:
     :param attrs: the entry attributes
     """
     # obtain the LDAP client object
-    ldap_client: LDAPObject = ldap_init(errors)
+    ldap_client: LDAPObject = ldap_init(errors=errors)
 
     bound: bool = False
     # was the LDAP client object obtained ?
     if ldap_client:
         # yes, bind it with the LDAP server
-        bound = ldap_bind(errors, ldap_client)
-
-    # were there errors ?
+        bound = ldap_bind(errors=errors,
+                          ldap_client=ldap_client)
+    # errors ?
     if not errors:
         # no, proceed
         ldiff: list[tuple[any, any]] = modlist.addModlist(attrs)
@@ -136,10 +146,13 @@ def ldap_add_entry(errors: list[str], entry_dn: str, attrs: dict) -> None:
 
     # unbind the LDAP client, if applicable
     if bound:
-        ldap_unbind(errors, ldap_client)
+        ldap_unbind(errors=errors,
+                    ldap_client=ldap_client)
 
 
-def ldap_modify_entry(errors: list[str], entry_dn: str, mod_entry: list[tuple[int, str, any]]) -> None:
+def ldap_modify_entry(errors: list[str],
+                      entry_dn: str,
+                      mod_entry: list[tuple[int, str, any]]) -> None:
     """
     Add an entry to the LDAP store.
 
@@ -148,15 +161,15 @@ def ldap_modify_entry(errors: list[str], entry_dn: str, mod_entry: list[tuple[in
     :param mod_entry: the list of modified entry attributes
     """
     # obtain the LDAP client object
-    conn: LDAPObject = ldap_init(errors)
+    conn: LDAPObject = ldap_init(errors=errors)
 
     bound: bool = False
     # was the LDAP client object obtained ?
     if conn:
         # yes, bind it with the LDAP server
-        bound = ldap_bind(errors, conn)
-
-    # were there errors ?
+        bound = ldap_bind(errors=errors,
+                          ldap_client=conn)
+    # errors ?
     if not errors:
         # no, proceed
         try:
@@ -167,10 +180,12 @@ def ldap_modify_entry(errors: list[str], entry_dn: str, mod_entry: list[tuple[in
 
     # unbind the LDAP client, if applicable
     if bound:
-        ldap_unbind(errors, conn)
+        ldap_unbind(errors=errors,
+                    ldap_client=conn)
 
 
-def ldap_delete_entry(errors: list[str], entry_dn: str) -> None:
+def ldap_delete_entry(errors: list[str],
+                      entry_dn: str) -> None:
     """
     Remove an entry to the LDAP store.
 
@@ -178,15 +193,15 @@ def ldap_delete_entry(errors: list[str], entry_dn: str) -> None:
     :param entry_dn: the entry DN
     """
     # obtain the LDAP client object
-    conn: LDAPObject = ldap_init(errors)
+    conn: LDAPObject = ldap_init(errors=errors)
 
     bound: bool = False
     # was the LDAP client object obtained ?
     if conn:
         # yes, bind it with the LDAP server
-        bound = ldap_bind(errors, conn)
-
-    # were there errors ?
+        bound = ldap_bind(errors=errors,
+                          ldap_client=conn)
+    # errors ?
     if not errors:
         # no, proceed
         try:
@@ -196,10 +211,13 @@ def ldap_delete_entry(errors: list[str], entry_dn: str) -> None:
 
     # unbind the LDAP client, if applicable
     if bound:
-        ldap_unbind(errors, conn)
+        ldap_unbind(errors=errors,
+                    ldap_client=conn)
 
 
-def ldap_modify_user(errors: list[str], user_id: str, attrs: list[tuple[str, bytes | None]]) -> None:
+def ldap_modify_user(errors: list[str],
+                     user_id: str,
+                     attrs: list[tuple[str, bytes | None]]) -> None:
     """
     Modify a user entry at the LDAP store.
 
@@ -208,16 +226,17 @@ def ldap_modify_user(errors: list[str], user_id: str, attrs: list[tuple[str, byt
     :param attrs: the list of modified attributes
     """
     # invoke the search operation
-    search_data: list[tuple[str, dict]] = ldap_search(errors, f"cn=users,{LDAP_BASE_DN}",
-                                                      [attr[0] for attr in attrs],
-                                                      ldap.SCOPE_ONELEVEL, f"cn={user_id}")
-
+    search_data: list[tuple[str, dict]] = ldap_search(errors=errors,
+                                                      base_dn=f"cn=users,{LDAP_BASE_DN}",
+                                                      attrs=[attr[0] for attr in attrs],
+                                                      scope=ldap.SCOPE_ONELEVEL,
+                                                      filter_str=f"cn={user_id}")
     # did the search operation returned data ?
     if not search_data:  # search_data is None or len(search_data) == 0
         # no, report the error
         errors.append(f"Error on the LDAP modify user operation: User '{user_id}' not found")
 
-    # were there errors ?
+    # errors ?
     if not errors:
         # no, proceed
         entry_dn: str = search_data[0][0]
@@ -242,10 +261,15 @@ def ldap_modify_user(errors: list[str], user_id: str, attrs: list[tuple[str, byt
         # are there attributes to be modified ?
         if len(mod_entries) > 0:
             # yes, modify them
-            ldap_modify_entry(errors, entry_dn, mod_entries)
+            ldap_modify_entry(errors=errors,
+                              entry_dn=entry_dn,
+                              mod_entry=mod_entries)
 
 
-def ldap_change_pwd(errors: list[str], user_dn: str, new_pwd: str, curr_pwd: str | None = None) -> str:
+def ldap_change_pwd(errors: list[str],
+                    user_dn: str,
+                    new_pwd: str,
+                    curr_pwd: str | None = None) -> str:
     """
     Modify a user password at the LDAP store.
 
@@ -266,12 +290,15 @@ def ldap_change_pwd(errors: list[str], user_dn: str, new_pwd: str, curr_pwd: str
         # was the password provided ?
         if curr_pwd:
             # yes, perform the bind with the DN provided
-            bound = ldap_bind(errors, ldap_client, user_dn, curr_pwd)
+            bound = ldap_bind(errors=errors,
+                              ldap_client=ldap_client,
+                              bind_dn=user_dn,
+                              bind_pwd=curr_pwd)
         else:
             # no, perform the standard bind
-            bound = ldap_bind(errors, ldap_client)
-
-    # were there errors ?
+            bound = ldap_bind(errors=errors,
+                              ldap_client=ldap_client)
+    # errors ?
     if not errors:
         # no, proceed
         try:
@@ -293,13 +320,17 @@ def ldap_change_pwd(errors: list[str], user_dn: str, new_pwd: str, curr_pwd: str
 
     # unbind the LDAP client, if applicable
     if bound:
-        ldap_unbind(errors, ldap_client)
-
+        ldap_unbind(errors=errors,
+                    ldap_client=ldap_client)
     return result
 
 
-def ldap_search(errors: list[str], base_dn: str,  attrs: list[str],
-                scope: str = None, filter_str: str = None, attrs_only: bool = False) -> list[tuple[str, dict]]:
+def ldap_search(errors: list[str],
+                base_dn: str,
+                attrs: list[str],
+                scope: str = None,
+                filter_str: str = None,
+                attrs_only: bool = False) -> list[tuple[str, dict]]:
     """
     Perform a search operation on the LDAP store, and return its results.
 
@@ -315,15 +346,15 @@ def ldap_search(errors: list[str], base_dn: str,  attrs: list[str],
     result:  list[tuple[str, dict]] | None = None
 
     # obtain the LDAP client object
-    conn: LDAPObject = ldap_init(errors)
+    conn: LDAPObject = ldap_init(errors=errors)
 
     bound: bool = False
     # was the LDAP client object obtained ?
     if conn:
         # yes, bind it with the LDAP server
-        bound = ldap_bind(errors, conn)
-
-    # were there errors ?
+        bound = ldap_bind(errors=errors,
+                          ldap_client=conn)
+    # errors ?
     if not errors:
         # no, proceed (if 'attrs_only' is specified, the values for the attributes are not returned)
         attr_vals: int = 1 if attrs_only else 0
@@ -339,12 +370,14 @@ def ldap_search(errors: list[str], base_dn: str,  attrs: list[str],
 
     # unbind the LDAP client, if applicable
     if bound:
-        ldap_unbind(errors, conn)
-
+        ldap_unbind(errors=errors,
+                    ldap_client=conn)
     return result
 
 
-def ldap_get_value(errors: list[str], entry_dn: str, attr: str) -> bytes:
+def ldap_get_value(errors: list[str],
+                   entry_dn: str,
+                   attr: str) -> bytes:
     """
     Retrieve and return the value of an attribute at the LDAP store.
 
@@ -353,13 +386,16 @@ def ldap_get_value(errors: list[str], entry_dn: str, attr: str) -> bytes:
     :param attr: target attribute
     :return: the target attribute's value
     """
-    data: list[bytes] = ldap_get_value_list(errors, entry_dn, attr)
-    result: bytes = data[0] if isinstance(data, list) and len(data) > 0 else None
+    data: list[bytes] = ldap_get_value_list(errors=errors,
+                                            entry_dn=entry_dn,
+                                            attr=attr)
+    return data[0] if isinstance(data, list) and len(data) > 0 else None
 
-    return result
 
-
-def ldap_add_value(errors: list[str], entry_dn: str, attr: str, value: bytes) -> None:
+def ldap_add_value(errors: list[str],
+                   entry_dn: str,
+                   attr: str,
+                   value: bytes) -> None:
     """
     Add a value to an attribute at the LDAP store.
 
@@ -370,10 +406,15 @@ def ldap_add_value(errors: list[str], entry_dn: str, attr: str, value: bytes) ->
     :return: the target attribute's value
     """
     mod_entries: list[tuple[int, str, bytes]] = [(ldap.MOD_ADD, attr, value)]
-    ldap_modify_entry(errors, entry_dn, mod_entries)
+    ldap_modify_entry(errors=errors,
+                      entry_dn=entry_dn,
+                      mod_entry=mod_entries)
 
 
-def ldap_set_value(errors: list[str], entry_dn: str, attr: str, value: bytes | None) -> None:
+def ldap_set_value(errors: list[str],
+                   entry_dn: str,
+                   attr: str,
+                   value: bytes | None) -> None:
     """
     Add a value to an attribute at the LDAP store.
 
@@ -384,9 +425,10 @@ def ldap_set_value(errors: list[str], entry_dn: str, attr: str, value: bytes | N
     :return: the target attribute's value
     """
     # obtain the target attribute's current value
-    curr_value: bytes = ldap_get_value(errors, entry_dn, attr)
-
-    # were there errors ?
+    curr_value: bytes = ldap_get_value(errors=errors,
+                                       entry_dn=entry_dn,
+                                       attr=attr)
+    # errors ?
     if not errors:
         # no, determine the modification mode
         mode: int | None = None
@@ -402,10 +444,14 @@ def ldap_set_value(errors: list[str], entry_dn: str, attr: str, value: bytes | N
         if mode is not None:
             # yes, update the LDAP store
             mod_entries: list[tuple[int, str, bytes]] = [(mode, attr, value)]
-            ldap_modify_entry(errors, entry_dn, mod_entries)
+            ldap_modify_entry(errors=errors,
+                              entry_dn=entry_dn,
+                              mod_entry=mod_entries)
 
 
-def ldap_get_value_list(errors: list[str], entry_dn: str, attr: str) -> list[bytes]:
+def ldap_get_value_list(errors: list[str],
+                        entry_dn: str,
+                        attr: str) -> list[bytes]:
     """
     Retrieve and return the list of values of attribute *attr* in the LDAP store.
 
@@ -418,8 +464,9 @@ def ldap_get_value_list(errors: list[str], entry_dn: str, attr: str) -> list[byt
     result: list[bytes] | None = None
 
     # perform the search operation
-    search_data: list[tuple[str, dict]] = ldap_search(errors, entry_dn, [attr])
-
+    search_data: list[tuple[str, dict]] = ldap_search(errors=errors,
+                                                      base_dn=entry_dn,
+                                                      attrs=[attr])
     # did the search operation return data ?
     if isinstance(search_data, list) and len(search_data) > 0:
         # yes, proceed
@@ -429,7 +476,9 @@ def ldap_get_value_list(errors: list[str], entry_dn: str, attr: str) -> list[byt
     return result
 
 
-def ldap_get_values(errors: list[str], entry_dn: str, attrs: list[str]) -> tuple[bytes,...]:
+def ldap_get_values(errors: list[str],
+                    entry_dn: str,
+                    attrs: list[str]) -> tuple[bytes,...]:
     """
     Retrieve and return the values of attributes *attrs* in the LDAP store.
 
@@ -442,8 +491,9 @@ def ldap_get_values(errors: list[str], entry_dn: str, attrs: list[str]) -> tuple
     result: tuple[bytes,...] | None = None
 
     # perform the search operation
-    search_data: tuple = ldap_get_values_lists(errors, entry_dn, attrs)
-
+    search_data: tuple = ldap_get_values_lists(errors=errors,
+                                               entry_dn=entry_dn,
+                                               attrs=attrs)
     # did the search operation return data ?
     if isinstance(search_data, tuple):
         # yes, proceed
@@ -453,7 +503,9 @@ def ldap_get_values(errors: list[str], entry_dn: str, attrs: list[str]) -> tuple
     return result
 
 
-def ldap_get_values_lists(errors: list[str], entry_dn: str, attrs: list[str]) -> tuple[list[bytes],...]:
+def ldap_get_values_lists(errors: list[str],
+                          entry_dn: str,
+                          attrs: list[str]) -> tuple[list[bytes],...]:
     """
     Retrieve and return the lists of values of attributes *attrs* in the LDAP store.
 
@@ -466,8 +518,9 @@ def ldap_get_values_lists(errors: list[str], entry_dn: str, attrs: list[str]) ->
     result: tuple[list[bytes],...] | None = None
 
     # perform the search operation
-    search_data: list[tuple[str, dict]] = ldap_search(errors, entry_dn, attrs)
-
+    search_data: list[tuple[str, dict]] = ldap_search(errors=errors,
+                                                      base_dn=entry_dn,
+                                                      attrs=attrs)
     # did the search operation return data ?
     if isinstance(search_data, list) and len(search_data) > 0:
         # yes, proceed
@@ -496,6 +549,6 @@ def __ldap_except_msg(exc: Exception) -> str:
         if info:
             result = f"{result[:-1]}; Info: {info}'"
     else:
-        result: str = exc_format(exc, sys.exc_info())
-
+        result: str = exc_format(exc=exc,
+                                 exc_info=sys.exc_info())
     return result
