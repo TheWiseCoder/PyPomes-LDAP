@@ -1,6 +1,6 @@
 import ldap
+import ldap.modlist
 import sys
-from ldap import LDAPError, modlist
 from ldap.ldapobject import LDAPObject
 from pathlib import Path
 from typing import Final, TextIO
@@ -9,16 +9,18 @@ from pypomes_core import (
     env_get_str, env_get_int, env_get_path, exc_format
 )
 
-_val: str = env_get_str(f"{APP_PREFIX}_LDAP_BASE_DN")
+_val: str = env_get_str(key=f"{APP_PREFIX}_LDAP_BASE_DN")
 LDAP_BASE_DN: Final[str] = None if _val is None else _val.replace(":", "=")
-_val = env_get_str(f"{APP_PREFIX}_LDAP_BIND_DN")
+_val = env_get_str(key=f"{APP_PREFIX}_LDAP_BIND_DN")
 LDAP_BIND_DN:  Final[str] = None if _val is None else _val.replace(":", "=")
-LDAP_BIND_PWD:  Final[str] = env_get_str(f"{APP_PREFIX}_LDAP_BIND_PWD")
-LDAP_SERVER_URI:  Final[str] = env_get_str(f"{APP_PREFIX}_LDAP_SERVER_URI")
-LDAP_TIMEOUT:  Final[int] = env_get_int(f"{APP_PREFIX}_LDAP_TIMEOUT", 30)
-LDAP_TRACE_FILEPATH:  Final[Path] = env_get_path(f"{APP_PREFIX}_LDAP_TRACE_FILEPATH",
-                                                 TEMP_FOLDER / f"{APP_PREFIX}_ldap.log")
-LDAP_TRACE_LEVEL:  Final[int] = env_get_int(f"{APP_PREFIX}_LDAP_TRACE_LEVEL", 0)
+LDAP_BIND_PWD:  Final[str] = env_get_str(key=f"{APP_PREFIX}_LDAP_BIND_PWD")
+LDAP_SERVER_URI:  Final[str] = env_get_str(key=f"{APP_PREFIX}_LDAP_SERVER_URI")
+LDAP_TIMEOUT:  Final[int] = env_get_int(key=f"{APP_PREFIX}_LDAP_TIMEOUT",
+                                        def_value=30)
+LDAP_TRACE_FILEPATH:  Final[Path] = env_get_path(key=f"{APP_PREFIX}_LDAP_TRACE_FILEPATH",
+                                                 def_value=TEMP_FOLDER / f"{APP_PREFIX}_ldap.log")
+LDAP_TRACE_LEVEL:  Final[int] = env_get_int(key=f"{APP_PREFIX}_LDAP_TRACE_LEVEL",
+                                            def_value=0)
 
 
 def ldap_init(errors: list[str],
@@ -137,7 +139,7 @@ def ldap_add_entry(errors: list[str],
     # errors ?
     if not errors:
         # no, proceed
-        ldiff: list[tuple[any, any]] = modlist.addModlist(attrs)
+        ldiff: list[tuple[any, any]] = ldap.modlist.addModlist(attrs)
         try:
             ldap_client.add_s(dn=entry_dn,
                               modlist=ldiff)
@@ -478,7 +480,7 @@ def ldap_get_value_list(errors: list[str],
 
 def ldap_get_values(errors: list[str],
                     entry_dn: str,
-                    attrs: list[str]) -> tuple[bytes,...]:
+                    attrs: list[str]) -> tuple[bytes, ...]:
     """
     Retrieve and return the values of attributes *attrs* in the LDAP store.
 
@@ -488,7 +490,7 @@ def ldap_get_values(errors: list[str],
     :return: the values for the target attributes
     """
     # initialize the return variable
-    result: tuple[bytes,...] | None = None
+    result: tuple[bytes, ...] | None = None
 
     # perform the search operation
     search_data: tuple = ldap_get_values_lists(errors=errors,
@@ -505,7 +507,7 @@ def ldap_get_values(errors: list[str],
 
 def ldap_get_values_lists(errors: list[str],
                           entry_dn: str,
-                          attrs: list[str]) -> tuple[list[bytes],...]:
+                          attrs: list[str]) -> tuple[list[bytes], ...]:
     """
     Retrieve and return the lists of values of attributes *attrs* in the LDAP store.
 
@@ -515,7 +517,7 @@ def ldap_get_values_lists(errors: list[str],
     :return: the target attributes' lists of values
     """
     # initialize the return variable
-    result: tuple[list[bytes],...] | None = None
+    result: tuple[list[bytes], ...] | None = None
 
     # perform the search operation
     search_data: list[tuple[str, dict]] = ldap_search(errors=errors,
@@ -540,7 +542,7 @@ def __is_secure(conn: LDAPObject) -> bool:
 # constrói a mensagem de erro a partir da exceção produzida
 def __ldap_except_msg(exc: Exception) -> str:
 
-    if isinstance(exc, LDAPError):
+    if isinstance(exc, ldap.LDAPError):
         err_data: any = exc.args[0]
         # type(exc) -> <class '<nome-da-classe'>
         cls: str = f"{type(exc)}"[8:-2]
