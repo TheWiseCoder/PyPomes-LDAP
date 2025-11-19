@@ -3,7 +3,7 @@ import ldap.modlist
 import sys
 from ldap.ldapobject import LDAPObject
 from pathlib import Path
-from typing import Final, TextIO
+from typing import Any, Final, TextIO
 from pypomes_core import (
     APP_PREFIX, TEMP_FOLDER,
     env_get_str, env_get_int, env_get_path, exc_format
@@ -140,7 +140,7 @@ def ldap_add_entry(entry_dn: str,
         bound: bool = ldap_bind(ldap_client=ldap_client,
                                 errors=errors)
         if not errors:
-            ldiff: list[tuple[any, any]] = ldap.modlist.addModlist(attrs)
+            ldiff: list[tuple[Any, Any]] = ldap.modlist.addModlist(attrs)
             try:
                 ldap_client.add_s(dn=entry_dn,
                                   modlist=ldiff)
@@ -154,7 +154,7 @@ def ldap_add_entry(entry_dn: str,
 
 
 def ldap_modify_entry(entry_dn: str,
-                      mod_entry: list[tuple[int, str, any]],
+                      mod_entry: list[tuple[int, str, Any]],
                       errors: list[str] = None) -> None:
     """
     Add an entry to the LDAP store.
@@ -323,7 +323,7 @@ def ldap_change_pwd(user_dn: str,
 
 def ldap_search(base_dn: str,
                 attrs: list[str],
-                scope: str = None,
+                scope: int = None,
                 filter_str: str = None,
                 attrs_only: bool = False,
                 errors: list[str] = None) -> list[tuple[str, dict]]:
@@ -534,7 +534,7 @@ def __is_secure(conn: LDAPObject) -> bool:
 def __ldap_except_msg(exc: Exception) -> str:
 
     if isinstance(exc, ldap.LDAPError):
-        err_data: any = exc.args[0]
+        err_data: Any = exc.args[0]
         # type(exc) -> <class '<class-name'>
         cls: str = f"{type(exc)}"[8:-2]
         result: str = f"'Type: {cls}; Code: {err_data.get('result')}; Msg: {err_data.get('desc')}'"
