@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "hatchling>=1.28.0"
+    "hatchling>=1.32.4"
 ]
 build-backend = "hatchling.build"
 
@@ -19,7 +19,7 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
-    "pypomes_core>=2.9.4",
+    "pypomes-core>=3.3.2",
     "python-ldap>=3.4.5"
 ]
 
